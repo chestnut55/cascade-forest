@@ -62,7 +62,7 @@ def t2d_data():
     feature_identifier = 'k__'
     feat = [s for s in f.columns if sum([s2 in s for s2 in feature_identifier.split(':')]) > 0]
     f = f.loc[:, feat].astype('float')
-    # f = (f - f.min()) / (f.max() - f.min())
+    # f = (f - f.min( )) / (f.max() - f.min())
 
     return f, integer_encoded
 

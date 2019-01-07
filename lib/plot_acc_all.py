@@ -62,26 +62,16 @@ def load_json(path):
             lines.append(row)
     return json.loads("\n".join(lines))
 
-def feat_indx(database_name, threhold):
-    output_dir = osp.join("output", "result")
-    path = osp.join(output_dir, database_name)
-    file = open(path, 'r')
-    dicts = json.load(file)
+def feat_indx(database_name):
+    feat_idx = pd.Series.from_csv(database_name + '_importance.csv').index.tolist()
 
-    for key, value in dicts.iteritems():
-        if key == str(threhold):
-            df = pd.DataFrame({'feature': value.keys(), 'importance': value.values()})
-            df = df.sort_values(by=['importance'],ascending=False)
-
-            feat_idx = df['feature'].tolist()
-
-            feat_idx = [int(f) for f in feat_idx]
-
-            # if database_name == 'obesity':
-            #     return feat_idx[:250]
-            # elif database_name == 't2d':
-            #     return feat_idx[:50]
-            return feat_idx
+    if database_name == 'obesity':
+        return feat_idx[:80]
+    elif database_name == 't2d':
+        return feat_idx[:20]
+    elif database_name == 'cirrhosis':
+        return feat_idx[:45]
+    return feat_idx
 
 def cnn_acc(X, Y, train, test):
     ####CNN####################################################
@@ -206,27 +196,20 @@ def get_reduced_features():
 
 if __name__ == "__main__":
 
-    print get_reduced_features()
-    save_fig = True
-    # # ==============================================
-
-    f, ax = plt.subplots(2, 2,figsize=(10,5))
-
     cv = StratifiedKFold(n_splits=5, shuffle=False, random_state=0)
 
-    clf_rf = RandomForestClassifier(n_estimators=100, random_state=0)
+    clf_rf = RandomForestClassifier(n_estimators=50, random_state=0)
 
     clf_svm = SVC(kernel='linear', C=1,
                   gamma=0.001, random_state=0, probability=True)
 
-    config = load_json("/home/qiang/repo/python/cascade_clf/examples/demo_ca.json")
+    config = load_json("/home/qiang/repo/python2/cascade_forest/examples/demo_ca.json")
     clf_gc = GCForest(config)
 
-    datasets = ['cirrhosis', 't2d', 'obesity']
-    classifiers = [(clf_svm, 'black', "SVM"),
-              (clf_rf, 'green', "Random Forest"),
-              ('cnn', 'purple', "CNN"),
-              (clf_gc, 'red', "Deep Forest")]
+    datasets = ['cirrhosis','t2d','obesity']
+    classifiers = [[clf_svm, 'black', "SVM"],
+              [clf_rf, 'green', "Random Forest"]]
+              #['cnn', 'purple', "CNN"],]
 
     for idx, classifier in enumerate(classifiers):
         acc_before = []
@@ -234,36 +217,33 @@ if __name__ == "__main__":
         for dataset_idx, name in enumerate(datasets):
             X = None
             Y = None
-            if dataset_idx == 0:
+            if name == 'cirrhosis':
                 X, Y = load.cirrhosis_data()
-                feat_idx = feat_indx(name, 0.001)
+                feat_idx = feat_indx(name)
                 X_hat = X.ix[:, feat_idx]
-            elif dataset_idx == 1:
+            elif name == 't2d':
                 X, Y = load.t2d_data()
-                feat_idx = feat_indx(name, 0.001)
+                feat_idx = feat_indx(name)
                 X_hat = X.ix[:, feat_idx]
-            elif dataset_idx == 2:
+            elif name == 'obesity':
                 X, Y = load.obesity_data()
-                feat_idx = feat_indx(name, 0.001)
+                feat_idx = feat_indx(name)
                 X_hat = X.ix[:, feat_idx]
             else:
                 raise Exception('the dataset is not defined!!!')
 
-            if idx == 0 or idx ==1:
+            if classifier[2] == 'SVM' or classifier[2] == 'Random Forest':
                 clf_acc_before = cross_val_score(classifier[0], X, Y, cv=cv, scoring='accuracy')
                 clf_acc_after = cross_val_score(classifier[0], X_hat, Y, cv=cv, scoring='accuracy')
             else:
                 clf_acc_before = []
                 clf_acc_after = []
 
-                # if idx == 3:
-                #     cv = StratifiedKFold(n_splits=5, shuffle=False, random_state=0)
-
                 for train, test in cv.split(X, Y):
-                    if idx == 2:  ## CNN
+                    if classifier[2] == 'CNN':  ## CNN
                         accuracy = cnn_acc(X, Y, train, test)
                         accuracy2 = cnn_acc(X_hat, Y, train, test)
-                    elif idx == 3: ## gcForest
+                    elif classifier[2] == 'Deep Forest': ## gcForest
                         accuracy = clf_acc(classifier[0],X, Y, train, test)
                         accuracy2 = clf_acc(classifier[0],X_hat, Y, train, test)
                     clf_acc_before.append(accuracy)
@@ -271,52 +251,5 @@ if __name__ == "__main__":
 
             acc_before.append(np.average(clf_acc_before))
             acc_after.append(np.average(clf_acc_after))
-
-        n_groups = 3
-        index = np.arange(n_groups)
-        bar_width = 0.24
-        opacity = 0.8
-
-
-        if idx == 0:
-            x, y = 0, 0
-            color_a = 'm'
-            color_b = 'y'
-        elif idx == 1:
-            x, y = 0, 1
-            color_a = 'black'
-            color_b = 'gray'
-        elif idx == 2:
-            x, y = 1, 0
-            color_a = 'b'
-            color_b = 'c'
-        elif idx == 3:
-            x, y = 1, 1
-            color_a = 'r'
-            color_b = 'g'
-        ax[x, y].set_ylabel('Accuracy')
-        ax[x, y].set_xticks(np.arange(n_groups) + bar_width / 2)
-        ax[x, y].set_xticklabels(('cirrhosis', 't2d', 'obesity'))
-        ax[x, y].set_ylim([0, 1.0])
-        ax[x, y].set_title(classifier[2])
-
-
-        rect1 = ax[x, y].bar(index, acc_before, bar_width,
-                       alpha=opacity,
-                       color=color_a,
-                       label='Before')
-        rect2 = ax[x, y].bar(index + bar_width, acc_after, bar_width,
-                       alpha=opacity,
-                       color=color_b,
-                       label='After')
-
-        autolabel(rect1, ax[x, y])
-        autolabel(rect2, ax[x, y])
-        ax[x, y].legend((rect1, rect2), ('Before', 'After'),loc='upper right', fontsize=8)
-
-    plt.subplots_adjust(hspace=0.5)
-    if save_fig:
-        plt.savefig('fs.png', bbox_inches='tight')
-        plt.close(f)
-    else:
-        plt.show()
+        print(acc_before)
+        print(acc_after)

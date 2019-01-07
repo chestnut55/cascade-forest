@@ -67,19 +67,17 @@ if __name__ == "__main__":
     save_fig = True
     # # ==============================================
 
-    f, ax = plt.subplots(1, 3, sharex=True, sharey=True,figsize=(10,5))
+    f, ax = plt.subplots(3, 1,figsize=(15,15))
 
-    params = {'legend.fontsize': 8, 'legend.handlelength': 0.5}
-    plt.rcParams.update(params)
 
-    cv = StratifiedKFold(n_splits=5, shuffle=False, random_state=0)
+    cv = StratifiedKFold(n_splits=10, shuffle=False, random_state=0)
 
     clf_rf = RandomForestClassifier(n_estimators=50, random_state=0)
 
     clf_svm = SVC(kernel='linear', C=1,
                   gamma=0.001, random_state=0, probability=True)
 
-    config = load_json("/home/qiang/repo/python/cascade_clf/examples/demo_ca.json")
+    config = load_json("/home/qiang/repo/python2/cascade_forest/examples/demo_ca.json")
     clf_gc = GCForest(config)
 
     datasets = ['cirrhosis', 't2d', 'obesity']
@@ -123,7 +121,7 @@ if __name__ == "__main__":
                     L2 = 64  # number of convolutions for second layer
                     L3 = 1024  # number of neurons for dense layer
                     learning_date = 1e-4  # learning rate
-                    epochs = 90  # number of times we loop through training data
+                    epochs = 100  # number of times we loop through training data
                     batch_size = 10  # number of data per batch
 
                     Y_trans = one_hot(Y)
@@ -219,7 +217,7 @@ if __name__ == "__main__":
 
                         X_train_enc = gc.fit_transform(X_train, y_train)
 
-                        probas_,  _ = gc.predict_proba(X_test)
+                        probas_ = gc.predict_proba(X_test)
                     else:
                         x[0].fit(X.iloc[train], Y[train])
                         probas_ = x[0].predict_proba(X.iloc[test])
