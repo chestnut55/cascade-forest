@@ -8,12 +8,13 @@ import numpy as np
 import tensorflow as tf
 from scipy import interp
 from sklearn.ensemble import RandomForestClassifier
-from sklearn.metrics import accuracy_score
-from sklearn.metrics import auc, roc_curve
-from sklearn.model_selection import StratifiedKFold
+from sklearn.metrics import auc, roc_curve,make_scorer,accuracy_score,precision_score,recall_score,f1_score
+from sklearn.model_selection import StratifiedKFold,RepeatedStratifiedKFold
 from sklearn.model_selection import cross_val_score
 from sklearn.preprocessing import OneHotEncoder
 from sklearn.svm import SVC
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.linear_model import LogisticRegression
 
 import gcforest.data_load_phy as load2
 import gcforest.data_load as load
@@ -67,20 +68,29 @@ if __name__ == "__main__":
     save_fig = True
     # # ==============================================
 
-    f, ax = plt.subplots(3, 1,figsize=(15,15))
+    # scoring = {'accuracy': make_scorer(accuracy_score),
+    #            'precision': make_scorer(precision_score),
+    #            'recall': make_scorer(recall_score),
+    #            'f1_score': make_scorer(f1_score)}
+
+    f, ax = plt.subplots(1, 3,figsize=(15,15))
 
 
-    cv = StratifiedKFold(n_splits=10, shuffle=False, random_state=0)
+    # cv = StratifiedKFold(n_splits=10, shuffle=False, random_state=0)
+    cv = RepeatedStratifiedKFold(n_splits=5, n_repeats=10, random_state=0)
 
     clf_rf = RandomForestClassifier(n_estimators=50, random_state=0)
 
-    clf_svm = SVC(kernel='linear', C=1,
-                  gamma=0.001, random_state=0, probability=True)
+    clf_svm = SVC(random_state=0, probability=True)
+
+    clf_knn = KNeighborsClassifier(n_neighbors=5)
+
+    clf_lg = LogisticRegression(random_state=0)
 
     config = load_json("/home/qiang/repo/python2/cascade_forest/examples/demo_ca.json")
     clf_gc = GCForest(config)
 
-    datasets = ['cirrhosis', 't2d', 'obesity']
+    datasets = ['cirrhosis','t2d','obesity']
 
     for dataset_idx, name in enumerate(datasets):
         X = None
@@ -94,32 +104,38 @@ if __name__ == "__main__":
         else:
             raise Exception('the dataset is not defined!!!')
 
-        scores = cross_val_score(clf_rf, X, Y, cv=cv, scoring='accuracy')
-        print("clf_rf", scores)
-        print("Accuracy of Random Forest Classifier: %0.3f (+/- %0.3f)" % (scores.mean(), scores.std() * 2))
-        LOGGER.info("Accuracy of Random Forest Classifier: %0.3f (+/- %0.3f)" % (scores.mean(), scores.std() * 2))
+        # accuracy = cross_val_score(clf_rf, X, Y, cv=cv, scoring='accuracy')
+        # precision = cross_val_score(clf_rf, X, Y, cv=cv, scoring='precision')
+        # recall = cross_val_score(clf_rf, X, Y, cv=cv, scoring='recall')
+        # f1_macro = cross_val_score(clf_rf, X, Y, cv=cv, scoring='f1_macro')
+        # roc_auc = cross_val_score(clf_rf, X, Y, cv=cv, scoring='roc_auc')
+        # scores = cross_val_score(estimator=clf_rf, X=X, y=Y, cv=cv, scoring=scoring)
+        #print("Accuracy of Random Forest Classifier: %0.3f (+/- %0.3f)" % (scores.mean(), scores.std() * 2))
 
-        scores = cross_val_score(clf_svm, X, Y, cv=cv, scoring='accuracy')
-        print("clf_svm", scores)
-        print("Accuracy SVM Classifier: %0.3f (+/- %0.3f)" % (scores.mean(), scores.std() * 2))
+        # scores = cross_val_score(clf_svm, X, Y, cv=cv, scoring='accuracy')
+        # scores = cross_val_score(estimator=clf_svm, X=X, y=Y, cv=cv, scoring=scoring)
+        #print("Accuracy SVM Classifier: %0.3f (+/- %0.3f)" % (scores.mean(), scores.std() * 2))
+
+
 
         gc_pred_acc = []
         cnn_pred_acc = []
 
-        params = [(clf_svm, 'black', "SVM"),
-                  (clf_rf, 'green', "Random Forest"),
-                  ('cnn', 'purple', "CNN"),
-                  (clf_gc, 'red', "Deep Forest")]
+        params = [(clf_lg, 'grey', "LR"),
+                  (clf_svm, 'purple', 'SVM'),
+                  (clf_knn, 'blue', 'KNN'),
+                  ('CNN', 'green', 'CNN'),
+                  (clf_gc, 'red', 'Deep Forest')]
         for idx, x in enumerate(params):
             mean_fpr = np.linspace(0, 1, 100)
             tprs = []
             aucs = []
             for train, test in cv.split(X, Y):
-                if idx == 2:  ## CNN
+                if idx == 3:  ## CNN
                     ####CNN####################################################
                     L1 = 32  # number of convolutions for first layer
                     L2 = 64  # number of convolutions for second layer
-                    L3 = 1024  # number of neurons for dense layer
+                    L3 = 512  # number of neurons for dense layer
                     learning_date = 1e-4  # learning rate
                     epochs = 100  # number of times we loop through training data
                     batch_size = 10  # number of data per batch
